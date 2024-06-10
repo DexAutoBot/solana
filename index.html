@@ -11,7 +11,6 @@
       <canvas id="myChart" width="400" height="100"></canvas>
       <p>Today profit: <span id="today-profit"></span>$</p>
     </div>
-    
 
     <script>
       // Your web app's Firebase configuration
@@ -93,9 +92,9 @@
             },
           },
         });
-        total_profit = datasets.profit.reduce((a, b) => a + b, 0)
-        document.getElementById('today-profit').innerText = total_profit.toFixed(3);
-
+        total_profit = datasets.profit.reduce((a, b) => a + b, 0);
+        document.getElementById("today-profit").innerText =
+          total_profit.toFixed(3);
       }
 
       // Fetch data and create chart
@@ -111,7 +110,12 @@
         rows = Object.values(data);
         previous_row = null;
         for (row of rows) {
-          labels.push(new Date(row.timestamp * 1000).toLocaleTimeString());
+          labels.push(
+            new Date(row.timestamp * 1000).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
           net_profit = 0;
           if (previous_row) {
             for (k of ["sol", "usdc", "usdt"]) {
@@ -121,7 +125,7 @@
               } else {
                 net_profit += profit_k;
               }
-              datasets[k].push(profit_k)
+              datasets[k].push(profit_k);
             }
             // console.log(net_profit)
             datasets.profit.push(net_profit);
