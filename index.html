@@ -7,7 +7,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
-    <canvas id="myChart" width="400" height="100"></canvas>
+    <div>
+      <canvas id="myChart" width="400" height="100"></canvas>
+      <p>Today profit: <span id="today-profit"></span>$</p>
+    </div>
+    
 
     <script>
       // Your web app's Firebase configuration
@@ -89,6 +93,9 @@
             },
           },
         });
+        total_profit = datasets.profit.reduce((a, b) => a + b, 0)
+        document.getElementById('today-profit').innerText = total_profit.toFixed(3);
+
       }
 
       // Fetch data and create chart
