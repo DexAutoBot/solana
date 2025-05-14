@@ -7,29 +7,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       body {
-        background-color: #1e1e1e; /* Dark background */
-        color: #ffffff; /* Light text */
+        background-color: #ffffff; /* Nền trắng */
+        color: #333333; /* Màu chữ đen */
         font-family: Arial, sans-serif;
+        margin: 20px;
       }
 
       .profit-container {
         width: 220px;
         padding: 10px;
         margin-bottom: 15px;
-        background-color: #333333; /* Darker background */
+        background-color: #f5f5f5; /* Màu nền nhạt */
         border-radius: 5px;
-        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.5);
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
       }
 
       .profit-text {
         float: left;
-        color: #a8dadc; /* Light teal color */
+        color: #555555; /* Màu chữ đậm */
       }
 
       .profit-value {
         float: right;
         font-weight: 800;
-        color: #f1faee; /* Light off-white color */
+        color: #1d3557; /* Màu xanh đậm */
       }
 
       .clear {
@@ -41,12 +42,13 @@
       }
 
       .reload-link {
-        color: #e63946;
+        color: #007bff;
         text-decoration: none;
         font-weight: bold;
       }
+
       .reload-link:hover {
-        color: #f1faee;
+        color: #0056b3;
       }
     </style>
   </head>
@@ -106,114 +108,6 @@
         return startOfDay.getTime();
       }
 
-      function fetchData() {
-        const startOfDayTimestamp = getStartOfDayTimestamp();
-        const endOfDayTimestamp = startOfDayTimestamp + 24 * 60 * 60 * 1000 - 1;
-
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .startAt(startOfDayTimestamp / 1000)
-          .endAt(endOfDayTimestamp / 1000)
-          .once("value")
-          .then((snapshot) => snapshot.val());
-      }
-
-      function createChart(labels, datasets) {
-        var ctx = document.getElementById("myChart").getContext("2d");
-        new Chart(ctx, {
-          type: "bar",
-          data: {
-            labels: labels,
-            datasets: [
-              {
-                label: "Profit",
-                data: datasets.profit,
-                backgroundColor: "#457b9d",
-                borderColor: "#1d3557",
-                borderWidth: 1,
-              },
-            ],
-          },
-          options: {
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  color: "#f1faee",
-                },
-              },
-              x: {
-                ticks: {
-                  color: "#f1faee",
-                },
-              },
-            },
-            plugins: {
-              legend: {
-                labels: {
-                  color: "#f1faee",
-                },
-              },
-            },
-          },
-        });
-
-        const totalProfit = datasets.profit.reduce((a, b) => a + b, 0);
-        document.getElementById("today-profit").textContent = formatCurrency(totalProfit);
-      }
-
-      function calculateProfit(currentWallet, previousWallet) {
-        let profit = 0;
-        if (currentWallet && previousWallet) {
-          for (let key of ["sol", "usdc", "usdt"]) {
-            const diff = currentWallet[key] - previousWallet[key];
-            profit += key === "sol" ? diff * currentWallet.price : diff;
-          }
-        }
-        return profit;
-      }
-
-      function processChartData(data) {
-        const labels = [];
-        const datasets = { profit: [] };
-        let previousRow = null;
-
-        for (let key in data) {
-          const row = data[key];
-          const timestamp = new Date(row.timestamp * 1000);
-
-          labels.push(
-            timestamp.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          );
-
-          if (previousRow) {
-            const profit = calculateProfit(row, previousRow);
-            datasets.profit.push(profit);
-          }
-
-          previousRow = row;
-        }
-
-        createChart(labels, datasets);
-      }
-
-      function fetchLastRecord() {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .limitToLast(1)
-          .once("value")
-          .then((snapshot) => {
-            let record = null;
-            snapshot.forEach((child) => (record = child.val()));
-            return record;
-          });
-      }
-
       function getStartOfWeekTimestamp() {
         const now = new Date();
         const dayOfWeek = now.getDay();
@@ -230,23 +124,98 @@
         return startOfMonth.getTime();
       }
 
-      Promise.all([
-        fetchLastRecord(),
-        fetchLastRecord(getStartOfWeekTimestamp()),
-        fetchLastRecord(getStartOfMonthTimestamp()),
-      ]).then(([currentWallet, weekWallet, monthWallet]) => {
-        const weekProfit = calculateProfit(currentWallet, weekWallet);
-        const monthProfit = calculateProfit(currentWallet, monthWallet);
+      function fetchAndCalculateProfit(startTimestamp) {
+        return database
+          .ref("/wallet")
+          .orderByChild("timestamp")
+          .startAt(startTimestamp / 1000)
+          .limitToFirst(1)
+          .once("value")
+          .then((snapshot) => {
+            let record = null;
+            snapshot.forEach((child) => (record = child.val()));
+            return record;
+          });
+      }
 
-        document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
-        document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
-      });
+      function fetchLastRecord() {
+        return database
+          .ref("/wallet")
+          .orderByChild("timestamp")
+          .limitToLast(1)
+          .once("value")
+          .then((snapshot) => {
+            let record = null;
+            snapshot.forEach((child) => (record = child.val()));
+            return record;
+          });
+      }
+
+      function calculateProfit(current, previous) {
+        let profit = 0;
+        if (current && previous) {
+          for (let key of ["sol", "usdc", "usdt"]) {
+            const diff = current[key] - previous[key];
+            profit += key === "sol" ? diff * current.price : diff;
+          }
+        }
+        return profit;
+      }
+
+      function updateProfits() {
+        const startWeekTimestamp = getStartOfWeekTimestamp();
+        const startMonthTimestamp = getStartOfMonthTimestamp();
+
+        Promise.all([
+          fetchLastRecord(),
+          fetchAndCalculateProfit(startWeekTimestamp),
+          fetchAndCalculateProfit(startMonthTimestamp),
+        ]).then(([currentWallet, weekStartWallet, monthStartWallet]) => {
+          const weekProfit = calculateProfit(currentWallet, weekStartWallet);
+          const monthProfit = calculateProfit(currentWallet, monthStartWallet);
+
+          document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
+          document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
+        });
+      }
+
+      function fetchData() {
+        const startOfDayTimestamp = getStartOfDayTimestamp();
+        const endOfDayTimestamp = startOfDayTimestamp + 24 * 60 * 60 * 1000 - 1;
+
+        return database
+          .ref("/wallet")
+          .orderByChild("timestamp")
+          .startAt(startOfDayTimestamp / 1000)
+          .endAt(endOfDayTimestamp / 1000)
+          .once("value")
+          .then((snapshot) => snapshot.val());
+      }
+
+      function processChartData(data) {
+        const labels = [];
+        const datasets = { profit: [] };
+        let previousRow = null;
+
+        for (let key in data) {
+          const row = data[key];
+          const timestamp = new Date(row.timestamp * 1000);
+          labels.push(timestamp.toLocaleTimeString());
+          if (previousRow) {
+            datasets.profit.push(calculateProfit(row, previousRow));
+          }
+          previousRow = row;
+        }
+
+        const totalProfit = datasets.profit.reduce((a, b) => a + b, 0);
+        document.getElementById("today-profit").textContent = formatCurrency(totalProfit);
+      }
 
       fetchData().then((data) => {
-        if (data) {
-          processChartData(data);
-        }
+        if (data) processChartData(data);
       });
+
+      updateProfits();
     </script>
   </body>
 </html>
