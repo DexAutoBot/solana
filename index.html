@@ -14,7 +14,10 @@
       }
 
       .profit-container {
-        width: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 250px;
         padding: 10px;
         margin-bottom: 15px;
         background-color: #f5f5f5;
@@ -23,33 +26,19 @@
       }
 
       .profit-text {
-        float: left;
+        font-weight: 500;
         color: #555555;
+        flex: 1;  /* Chiếm 1 phần không gian */
+        text-align: left;  /* Căn trái */
       }
 
       .profit-value {
-        float: right;
-        font-weight: 800;
+        font-weight: 700;
         color: #1d3557;
+        text-align: right;
+        min-width: 100px;  /* Đảm bảo độ rộng đủ để căn thẳng hàng */
       }
 
-      .clear {
-        clear: both;
-      }
-
-      .chart-container {
-        margin-bottom: 20px;
-      }
-
-      .reload-link {
-        color: #007bff;
-        text-decoration: none;
-        font-weight: bold;
-      }
-
-      .reload-link:hover {
-        color: #0056b3;
-      }
     </style>
   </head>
   <body>
