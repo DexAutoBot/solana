@@ -6,47 +6,76 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-      .profit-container {
-        width: 200px;
-        margin-bottom: 10px;
+      body {
+        background-color: #1e1e1e; /* Dark background */
+        color: #ffffff; /* Light text */
+        font-family: Arial, sans-serif;
       }
+
+      .profit-container {
+        width: 220px;
+        padding: 10px;
+        margin-bottom: 15px;
+        background-color: #333333; /* Darker background */
+        border-radius: 5px;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.5);
+      }
+
       .profit-text {
         float: left;
+        color: #a8dadc; /* Light teal color */
       }
+
       .profit-value {
         float: right;
         font-weight: 800;
+        color: #f1faee; /* Light off-white color */
       }
+
       .clear {
         clear: both;
+      }
+
+      .chart-container {
+        margin-bottom: 20px;
+      }
+
+      .reload-link {
+        color: #e63946;
+        text-decoration: none;
+        font-weight: bold;
+      }
+      .reload-link:hover {
+        color: #f1faee;
       }
     </style>
   </head>
   <body>
-    <div>
-      <a href="javascript:location.reload()">Reload</a>
+    <div class="chart-container">
+      <a href="javascript:location.reload()" class="reload-link">Reload</a>
       <canvas id="myChart" width="400" height="100"></canvas>
-      <div>
-        <div class="profit-container">
-          <span class="profit-text">Today profit:</span>
-          <span class="profit-value" id="today-profit"></span>
-          <div class="clear"></div>
-        </div>
-        <div class="profit-container">
-          <span class="profit-text">This week profit:</span>
-          <span class="profit-value" id="week-profit"></span>
-          <div class="clear"></div>
-        </div>
-        <div class="profit-container">
-          <span class="profit-text">This month profit:</span>
-          <span class="profit-value" id="month-profit"></span>
-          <div class="clear"></div>
-        </div>
-      </div>
+    </div>
+
+    <div class="profit-container">
+      <span class="profit-text">Today profit:</span>
+      <span class="profit-value" id="today-profit">0.00$</span>
+      <div class="clear"></div>
+    </div>
+
+    <div class="profit-container">
+      <span class="profit-text">This week profit:</span>
+      <span class="profit-value" id="week-profit">0.00$</span>
+      <div class="clear"></div>
+    </div>
+
+    <div class="profit-container">
+      <span class="profit-text">This month profit:</span>
+      <span class="profit-value" id="month-profit">0.00$</span>
+      <div class="clear"></div>
     </div>
 
     <script>
-      // Firebase Configuration (GIỮ NGUYÊN)
+      // Firebase Configuration
       var firebaseConfig = {
         apiKey: "AIzaSyCTq2EHClhJOex78SHYjy4pBJmIRg6rg5s",
         authDomain: "adept-turbine-416101.firebaseapp.com",
@@ -60,14 +89,19 @@
       firebase.initializeApp(firebaseConfig);
       var database = firebase.database();
 
+      function formatCurrency(value) {
+        return value.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "$";
+      }
+
       function getStartOfDayTimestamp() {
         const now = new Date();
         let startOfDay = new Date(now);
-
         if (now.getHours() < 7) {
           startOfDay.setDate(now.getDate() - 1);
         }
-
         startOfDay.setHours(7, 0, 0, 0);
         return startOfDay.getTime();
       }
@@ -95,6 +129,9 @@
               {
                 label: "Profit",
                 data: datasets.profit,
+                backgroundColor: "#457b9d",
+                borderColor: "#1d3557",
+                borderWidth: 1,
               },
             ],
           },
@@ -102,14 +139,28 @@
             scales: {
               y: {
                 beginAtZero: true,
+                ticks: {
+                  color: "#f1faee",
+                },
+              },
+              x: {
+                ticks: {
+                  color: "#f1faee",
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: "#f1faee",
+                },
               },
             },
           },
         });
 
         const totalProfit = datasets.profit.reduce((a, b) => a + b, 0);
-        document.getElementById("today-profit").textContent = 
-          totalProfit.toFixed(2) + "$";
+        document.getElementById("today-profit").textContent = formatCurrency(totalProfit);
       }
 
       function calculateProfit(currentWallet, previousWallet) {
@@ -150,20 +201,6 @@
         createChart(labels, datasets);
       }
 
-      function fetchAndCalculateProfit(startTimestamp) {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .startAt(startTimestamp / 1000)
-          .limitToFirst(1)
-          .once("value")
-          .then((snapshot) => {
-            let record = null;
-            snapshot.forEach((child) => (record = child.val()));
-            return record;
-          });
-      }
-
       function fetchLastRecord() {
         return database
           .ref("/wallet")
@@ -182,11 +219,6 @@
         const dayOfWeek = now.getDay();
         const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
         const startOfWeek = new Date(now.setDate(diff));
-
-        if (now.getHours() < 7) {
-          startOfWeek.setDate(startOfWeek.getDate() - 1);
-        }
-
         startOfWeek.setHours(7, 0, 0, 0);
         return startOfWeek.getTime();
       }
@@ -194,27 +226,20 @@
       function getStartOfMonthTimestamp() {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        if (now.getHours() < 7) {
-          startOfMonth.setDate(startOfMonth.getDate() - 1);
-        }
-
         startOfMonth.setHours(7, 0, 0, 0);
         return startOfMonth.getTime();
       }
 
       Promise.all([
         fetchLastRecord(),
-        fetchAndCalculateProfit(getStartOfWeekTimestamp()),
-        fetchAndCalculateProfit(getStartOfMonthTimestamp()),
-      ]).then(([currentWallet, weekStartWallet, monthStartWallet]) => {
-        const weekProfit = calculateProfit(currentWallet, weekStartWallet);
-        const monthProfit = calculateProfit(currentWallet, monthStartWallet);
+        fetchLastRecord(getStartOfWeekTimestamp()),
+        fetchLastRecord(getStartOfMonthTimestamp()),
+      ]).then(([currentWallet, weekWallet, monthWallet]) => {
+        const weekProfit = calculateProfit(currentWallet, weekWallet);
+        const monthProfit = calculateProfit(currentWallet, monthWallet);
 
-        document.getElementById("week-profit").textContent = 
-          weekProfit.toFixed(2) + "$";
-        document.getElementById("month-profit").textContent = 
-          monthProfit.toFixed(2) + "$";
+        document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
+        document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
       });
 
       fetchData().then((data) => {
