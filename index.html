@@ -7,18 +7,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       .profit-container {
-        width: 200px; /* Đặt chiều rộng cố định cho block */
-        margin-bottom: 10px; /* Khoảng cách giữa các block */
+        width: 200px;
+        margin-bottom: 10px;
       }
       .profit-text {
-        float: left; /* Căn chữ về bên trái */
+        float: left;
       }
       .profit-value {
-        float: right; /* Căn giá trị về bên phải */
+        float: right;
         font-weight: 800;
       }
       .clear {
-        clear: both; /* Đảm bảo các block không chồng lên nhau */
+        clear: both;
       }
     </style>
   </head>
@@ -46,7 +46,7 @@
     </div>
 
     <script>
-      // Your web app's Firebase configuration
+      // Firebase Configuration (GIỮ NGUYÊN)
       var firebaseConfig = {
         apiKey: "AIzaSyCTq2EHClhJOex78SHYjy4pBJmIRg6rg5s",
         authDomain: "adept-turbine-416101.firebaseapp.com",
@@ -56,108 +56,46 @@
         messagingSenderId: "849943819450",
         appId: "1:849943819450:web:36380cf0811e4c254ffe83",
       };
-      // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
 
-      // Reference to your Firebase database
+      firebase.initializeApp(firebaseConfig);
       var database = firebase.database();
+
       function getStartOfDayTimestamp() {
-        var now = new Date();
-        now.setHours(7, 0, 0, 0);
-        return now.getTime();
-      }
-      function getStartOfWeekTimestamp() {
         const now = new Date();
-        const dayOfWeek = now.getDay();
-        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        const startOfWeek = new Date(now.setDate(diff));
-        startOfWeek.setHours(7, 0, 0, 0);
-        return startOfWeek.getTime();
+        let startOfDay = new Date(now);
+
+        if (now.getHours() < 7) {
+          startOfDay.setDate(now.getDate() - 1);
+        }
+
+        startOfDay.setHours(7, 0, 0, 0);
+        return startOfDay.getTime();
       }
-      function getStartOfMonthTimestamp() {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        startOfMonth.setHours(7, 0, 0, 0);
-        return startOfMonth.getTime();
-      }
-      // Function to fetch data from Firebase
+
       function fetchData() {
-        var startOfDayTimestamp = getStartOfDayTimestamp();
-        var nowTimestamp = Date.now();
+        const startOfDayTimestamp = getStartOfDayTimestamp();
+        const endOfDayTimestamp = startOfDayTimestamp + 24 * 60 * 60 * 1000 - 1;
+
         return database
           .ref("/wallet")
           .orderByChild("timestamp")
           .startAt(startOfDayTimestamp / 1000)
-          .endAt(nowTimestamp / 1000)
+          .endAt(endOfDayTimestamp / 1000)
           .once("value")
-          .then(function (snapshot) {
-            var data = snapshot.val();
-            return data;
-          });
-      }
-      function fetchLastRecord() {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .limitToLast(1)
-          .once("value")
-          .then((snapshot) => {
-            let lastRecord = null;
-            snapshot.forEach((childSnapshot) => {
-              lastRecord = childSnapshot.val();
-            });
-            return lastRecord;
-          });
-      }
-      function fetchRecordByTime(startTimeTimestamp) {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .startAt(startTimeTimestamp / 1000)
-          .limitToFirst(1)
-          .once("value")
-          .then((snapshot) => {
-            let lastRecord = null;
-            snapshot.forEach((childSnapshot) => {
-              lastRecord = childSnapshot.val();
-            });
-            return lastRecord;
-          });
+          .then((snapshot) => snapshot.val());
       }
 
-      // Function to create chart
       function createChart(labels, datasets) {
         var ctx = document.getElementById("myChart").getContext("2d");
-        var myChart = new Chart(ctx, {
-          type: "bar", // or 'line', 'pie', etc.
+        new Chart(ctx, {
+          type: "bar",
           data: {
             labels: labels,
             datasets: [
               {
                 label: "Profit",
                 data: datasets.profit,
-                hidden: false,
               },
-              {
-                label: "SOL",
-                data: datasets.sol,
-                hidden: true,
-              },
-              {
-                label: "USDC",
-                data: datasets.usdc,
-                hidden: true,
-              },
-              {
-                label: "USDT",
-                data: datasets.usdt,
-                hidden: true,
-              },
-              // {
-              //   label: "Total",
-              //   data: datasets.total,
-              //   hidden: true,
-              // },
             ],
           },
           options: {
@@ -168,94 +106,121 @@
             },
           },
         });
-        total_profit = datasets.profit.reduce((a, b) => a + b, 0);
-        const formatProfit =
-          total_profit.toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
-          }) + "$";
-        document.getElementById("today-profit").innerHTML = formatProfit;
+
+        const totalProfit = datasets.profit.reduce((a, b) => a + b, 0);
+        document.getElementById("today-profit").textContent = 
+          totalProfit.toFixed(2) + "$";
       }
 
-      // Fetch data and create chart
-      fetchData().then(function (data) {
-        var labels = [];
-        var datasets = {
-          sol: [0],
-          usdc: [0],
-          usdt: [0],
-          profit: [0],
-          // total: [0],
-        };
-        rows = Object.values(data);
-        previous_row = null;
-        for (row of rows) {
+      function calculateProfit(currentWallet, previousWallet) {
+        let profit = 0;
+        if (currentWallet && previousWallet) {
+          for (let key of ["sol", "usdc", "usdt"]) {
+            const diff = currentWallet[key] - previousWallet[key];
+            profit += key === "sol" ? diff * currentWallet.price : diff;
+          }
+        }
+        return profit;
+      }
+
+      function processChartData(data) {
+        const labels = [];
+        const datasets = { profit: [] };
+        let previousRow = null;
+
+        for (let key in data) {
+          const row = data[key];
+          const timestamp = new Date(row.timestamp * 1000);
+
           labels.push(
-            new Date(row.timestamp * 1000).toLocaleTimeString("en-US", {
+            timestamp.toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
             })
           );
-          net_profit = 0;
-          if (previous_row) {
-            for (k of ["sol", "usdc", "usdt"]) {
-              profit_k = row[k] - previous_row[k];
-              if (k == "sol") {
-                net_profit += profit_k * row.price;
-              } else {
-                net_profit += profit_k;
-              }
-              datasets[k].push(profit_k);
-            }
-            // console.log(net_profit)
-            datasets.profit.push(net_profit);
+
+          if (previousRow) {
+            const profit = calculateProfit(row, previousRow);
+            datasets.profit.push(profit);
           }
-          previous_row = row;
+
+          previousRow = row;
         }
+
         createChart(labels, datasets);
-      });
-      function calculateProfit(currentWallet, checkingWallet) {
-        console.log(currentWallet, checkingWallet);
-        usdProfit = 0;
-        if (currentWallet && checkingWallet) {
-          current_price = currentWallet.price;
-          for (k of ["sol", "usdt", "usdc"]) {
-            if (k == "sol") {
-              usdProfit +=
-                (currentWallet[k] - checkingWallet[k]) * current_price;
-            } else {
-              usdProfit += currentWallet[k] - checkingWallet[k];
-            }
-          }
-          return usdProfit;
-        }
-        return usdProfit;
       }
-      startWeekTime = getStartOfWeekTimestamp();
-      startMonthTime = getStartOfMonthTimestamp();
+
+      function fetchAndCalculateProfit(startTimestamp) {
+        return database
+          .ref("/wallet")
+          .orderByChild("timestamp")
+          .startAt(startTimestamp / 1000)
+          .limitToFirst(1)
+          .once("value")
+          .then((snapshot) => {
+            let record = null;
+            snapshot.forEach((child) => (record = child.val()));
+            return record;
+          });
+      }
+
+      function fetchLastRecord() {
+        return database
+          .ref("/wallet")
+          .orderByChild("timestamp")
+          .limitToLast(1)
+          .once("value")
+          .then((snapshot) => {
+            let record = null;
+            snapshot.forEach((child) => (record = child.val()));
+            return record;
+          });
+      }
+
+      function getStartOfWeekTimestamp() {
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        const startOfWeek = new Date(now.setDate(diff));
+
+        if (now.getHours() < 7) {
+          startOfWeek.setDate(startOfWeek.getDate() - 1);
+        }
+
+        startOfWeek.setHours(7, 0, 0, 0);
+        return startOfWeek.getTime();
+      }
+
+      function getStartOfMonthTimestamp() {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        if (now.getHours() < 7) {
+          startOfMonth.setDate(startOfMonth.getDate() - 1);
+        }
+
+        startOfMonth.setHours(7, 0, 0, 0);
+        return startOfMonth.getTime();
+      }
+
       Promise.all([
         fetchLastRecord(),
-        fetchRecordByTime(startWeekTime),
-        fetchRecordByTime(startMonthTime),
-      ]).then((results) => {
-        currentWallet = results[0];
-        weekWallet = results[1];
-        monthWallet = results[2];
-        weekProfit = calculateProfit(currentWallet, weekWallet);
-        monthProfit = calculateProfit(currentWallet, monthWallet);
-        const formattedWeekProfit =
-          weekProfit.toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
-          }) + "$";
-        const formattedMonthProfit =
-          monthProfit.toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
-          }) + "$";
-        document.getElementById("week-profit").innerHTML = formattedWeekProfit;
-        document.getElementById("month-profit").innerHTML =
-          formattedMonthProfit;
+        fetchAndCalculateProfit(getStartOfWeekTimestamp()),
+        fetchAndCalculateProfit(getStartOfMonthTimestamp()),
+      ]).then(([currentWallet, weekStartWallet, monthStartWallet]) => {
+        const weekProfit = calculateProfit(currentWallet, weekStartWallet);
+        const monthProfit = calculateProfit(currentWallet, monthStartWallet);
+
+        document.getElementById("week-profit").textContent = 
+          weekProfit.toFixed(2) + "$";
+        document.getElementById("month-profit").textContent = 
+          monthProfit.toFixed(2) + "$";
+      });
+
+      fetchData().then((data) => {
+        if (data) {
+          processChartData(data);
+        }
       });
     </script>
   </body>
