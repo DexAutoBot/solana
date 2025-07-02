@@ -368,7 +368,7 @@
           return record;
         });
     }
-
+    updateProfits();
     // Fetch and process last 7 days data
     const startOfSevenDaysTimestamp = getLastSevenDaysTimestamp();
     const endOfDayTimestamp = new Date().getTime();
@@ -382,8 +382,6 @@
     fetchData(startOfYearTimestamp, endOfYearTimestamp).then((data) => {
       if (data) processChartData(data, "yearChart", "Yearly Profit by Month", "year");
     });
-
-    updateProfits();
   </script>
 </body>
 
