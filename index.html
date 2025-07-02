@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Firebase and Chart.js Example</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-      body {
+
+<head>
+  <title>Firebase and Chart.js Example</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 20px;
@@ -75,20 +76,40 @@
       margin-bottom: 10px;
       color: #333;
     }
+
     /* Responsive */
     @media (max-width: 768px) {
       .main-container {
         flex-direction: column;
       }
 
-      .profit-section, .chart-section {
+      .profit-section,
+      .chart-section {
         flex: 0 0 100%;
       }
     }
-    </style>
-  </head>
-  <body>
-    <div class="main-container">
+
+    /* Nút reload */
+    .reload-button {
+      align-self: center;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .reload-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="main-container">
     <!-- Khối profit -->
     <div class="profit-section">
       <div class="profit-container">
@@ -106,6 +127,7 @@
         <span class="profit-value" id="month-profit">0.00$</span>
         <div class="clear"></div>
       </div>
+      <button class="reload-button" onclick="location.reload(true);">Reload Data</button>
     </div>
 
     <!-- Khối biểu đồ -->
@@ -121,247 +143,248 @@
     </div>
   </div>
 
-    <script>
-      var firebaseConfig = {
-        apiKey: "AIzaSyCTq2EHClhJOex78SHYjy4pBJmIRg6rg5s",
-        authDomain: "adept-turbine-416101.firebaseapp.com",
-        databaseURL: "https://adept-turbine-416101-default-rtdb.firebaseio.com",
-        projectId: "adept-turbine-416101",
-        storageBucket: "adept-turbine-416101.appspot.com",
-        messagingSenderId: "849943819450",
-        appId: "1:849943819450:web:36380cf0811e4c254ffe83",
-      };
+  <script>
+    var firebaseConfig = {
+      apiKey: "AIzaSyCTq2EHClhJOex78SHYjy4pBJmIRg6rg5s",
+      authDomain: "adept-turbine-416101.firebaseapp.com",
+      databaseURL: "https://adept-turbine-416101-default-rtdb.firebaseio.com",
+      projectId: "adept-turbine-416101",
+      storageBucket: "adept-turbine-416101.appspot.com",
+      messagingSenderId: "849943819450",
+      appId: "1:849943819450:web:36380cf0811e4c254ffe83",
+    };
 
-      firebase.initializeApp(firebaseConfig);
-      var database = firebase.database();
-      var sevenDaysChart, yearChart;
+    firebase.initializeApp(firebaseConfig);
+    var database = firebase.database();
+    var sevenDaysChart, yearChart;
 
-      function formatCurrency(value) {
-        return value.toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }) + "$";
+    function formatCurrency(value) {
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + "$";
+    }
+
+    function getStartOfDayTimestamp() {
+      const now = new Date();
+      let startOfDay = new Date(now);
+      if (now.getHours() < 7) {
+        startOfDay.setDate(now.getDate() - 1);
+      }
+      startOfDay.setHours(7, 0, 0, 0);
+      return startOfDay.getTime();
+    }
+
+    function getStartOfWeekTimestamp() {
+      const now = new Date();
+      const day = now.getDay();
+      const startOfWeek = new Date(now);
+      const daysToMonday = (day + 6) % 7;
+      startOfWeek.setDate(now.getDate() - daysToMonday);
+      startOfWeek.setHours(0, 0, 0, 0);
+      return startOfWeek.getTime();
+    }
+
+    function getStartOfMonthTimestamp() {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      return startOfMonth.getTime();
+    }
+
+    function getLastSevenDaysTimestamp() {
+      const now = new Date();
+      const startOfSevenDays = new Date(now);
+      startOfSevenDays.setDate(now.getDate() - 6);
+      startOfSevenDays.setHours(0, 0, 0, 0);
+      return startOfSevenDays.getTime();
+    }
+
+    function getStartOfYearTimestamp() {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      startOfYear.setHours(0, 0, 0, 0);
+      return startOfYear.getTime();
+    }
+
+    function fetchData(startTimestamp, endTimestamp) {
+      return database
+        .ref("/wallet")
+        .orderByChild("timestamp")
+        .startAt(startTimestamp / 1000)
+        .endAt(endTimestamp / 1000)
+        .once("value")
+        .then((snapshot) => snapshot.val());
+    }
+
+    function createChart(canvasId, labels, data, title) {
+      var ctx = document.getElementById(canvasId).getContext("2d");
+      var chartInstance;
+
+      if (canvasId === "sevenDaysChart" && sevenDaysChart) {
+        sevenDaysChart.destroy();
+      } else if (canvasId === "yearChart" && yearChart) {
+        yearChart.destroy();
       }
 
-      function getStartOfDayTimestamp() {
-        const now = new Date();
-        let startOfDay = new Date(now);
-        if (now.getHours() < 7) {
-          startOfDay.setDate(now.getDate() - 1);
-        }
-        startOfDay.setHours(7, 0, 0, 0);
-        return startOfDay.getTime();
-      }
-
-      function getStartOfWeekTimestamp() {
-        const now = new Date();
-        const day = now.getDay();
-        const startOfWeek = new Date(now);
-        const daysToMonday = (day + 6) % 7;
-        startOfWeek.setDate(now.getDate() - daysToMonday);
-        startOfWeek.setHours(0, 0, 0, 0);
-        return startOfWeek.getTime();
-      }
-
-      function getStartOfMonthTimestamp() {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        return startOfMonth.getTime();
-      }
-
-      function getLastSevenDaysTimestamp() {
-        const now = new Date();
-        const startOfSevenDays = new Date(now);
-        startOfSevenDays.setDate(now.getDate() - 6);
-        startOfSevenDays.setHours(0, 0, 0, 0);
-        return startOfSevenDays.getTime();
-      }
-
-      function getStartOfYearTimestamp() {
-        const now = new Date();
-        const startOfYear = new Date(now.getFullYear(), 0, 1);
-        startOfYear.setHours(0, 0, 0, 0);
-        return startOfYear.getTime();
-      }
-
-      function fetchData(startTimestamp, endTimestamp) {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .startAt(startTimestamp / 1000)
-          .endAt(endTimestamp / 1000)
-          .once("value")
-          .then((snapshot) => snapshot.val());
-      }
-
-      function createChart(canvasId, labels, data, title) {
-        var ctx = document.getElementById(canvasId).getContext("2d");
-        var chartInstance;
-
-        if (canvasId === "sevenDaysChart" && sevenDaysChart) {
-          sevenDaysChart.destroy();
-        } else if (canvasId === "yearChart" && yearChart) {
-          yearChart.destroy();
-        }
-
-        chartInstance = new Chart(ctx, {
-          type: "bar",
-          data: {
-            labels: labels,
-            datasets: [{
-              label: title,
-              data: data,
-              backgroundColor: "#007bff",
-              borderColor: "#0056b3",
-              borderWidth: 1,
-            }],
-          },
-          options: {
-            scales: {
-              y: {
-                beginAtZero: true,
-              },
+      chartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: title,
+            data: data,
+            backgroundColor: "#007bff",
+            borderColor: "#0056b3",
+            borderWidth: 1,
+          }],
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
             },
           },
-        });
-
-        if (canvasId === "sevenDaysChart") {
-          sevenDaysChart = chartInstance;
-        } else if (canvasId === "yearChart") {
-          yearChart = chartInstance;
-        }
-      }
-
-      function processChartData(data, canvasId, title, period) {
-        const labels = [];
-        const profitData = [];
-        let previousRow = null;
-
-        if (period === "sevenDays") {
-          // Xử lý biểu đồ 7 ngày (theo ngày)
-          const dailyRecords = {};
-          for (let key in data) {
-            const row = data[key];
-            const timestamp = new Date(row.timestamp * 1000);
-            const dateKey = timestamp.toLocaleDateString();
-            dailyRecords[dateKey] = dailyRecords[dateKey] || [];
-            dailyRecords[dateKey].push(row);
-          }
-
-          for (let dateKey in dailyRecords) {
-            const records = dailyRecords[dateKey].sort((a, b) => a.timestamp - b.timestamp);
-            const firstRecord = records[0];
-            const lastRecord = records[records.length - 1];
-            const profit = calculateProfit(lastRecord, firstRecord);
-            labels.push(dateKey);
-            profitData.push(profit);
-          }
-        } else if (period === "year") {
-          // Xử lý biểu đồ năm (theo tháng)
-          const monthlyRecords = {};
-          for (let key in data) {
-            const row = data[key];
-            const timestamp = new Date(row.timestamp * 1000);
-            const monthKey = timestamp.toLocaleString("en-US", { month: "short", year: "numeric" });
-            monthlyRecords[monthKey] = monthlyRecords[monthKey] || [];
-            monthlyRecords[monthKey].push(row);
-          }
-
-          for (let monthKey in monthlyRecords) {
-            const records = monthlyRecords[monthKey].sort((a, b) => a.timestamp - b.timestamp);
-            const firstRecord = records[0];
-            const lastRecord = records[records.length - 1];
-            const profit = calculateProfit(lastRecord, firstRecord);
-            labels.push(monthKey);
-            profitData.push(profit);
-          }
-        }
-
-        // Sắp xếp nhãn theo thời gian
-        const sortedData = labels
-          .map((label, index) => ({ label, profit: profitData[index] }))
-          .sort((a, b) => new Date(a.label) - new Date(b.label));
-        const sortedLabels = sortedData.map(item => item.label);
-        const sortedProfits = sortedData.map(item => item.profit);
-
-        createChart(canvasId, sortedLabels, sortedProfits, title);
-      }
-
-      function calculateProfit(current, previous) {
-        let profit = 0;
-        if (current && previous) {
-          for (let key of ["sol", "usdc", "usdt"]) {
-            const diff = current[key] - previous[key];
-            profit += key === "sol" ? diff * current.price : diff;
-          }
-        }
-        return profit;
-      }
-
-      function updateProfits() {
-        const startDayTimestamp = getStartOfDayTimestamp();
-        const startWeekTimestamp = getStartOfWeekTimestamp();
-        const startMonthTimestamp = getStartOfMonthTimestamp();
-
-        Promise.all([
-          fetchLastRecord(),
-          fetchAndCalculateProfit(startDayTimestamp),
-          fetchAndCalculateProfit(startWeekTimestamp),
-          fetchAndCalculateProfit(startMonthTimestamp),
-        ]).then(([currentWallet, dayStartWallet, weekStartWallet, monthStartWallet]) => {
-          const dayProfit = calculateProfit(currentWallet, dayStartWallet);
-          const weekProfit = calculateProfit(currentWallet, weekStartWallet);
-          const monthProfit = calculateProfit(currentWallet, monthStartWallet);
-
-          document.getElementById("today-profit").textContent = formatCurrency(dayProfit);
-          document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
-          document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
-        });
-      }
-
-      function fetchLastRecord() {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .limitToLast(1)
-          .once("value")
-          .then((snapshot) => {
-            let record = null;
-            snapshot.forEach((child) => (record = child.val()));
-            return record;
-          });
-      }
-
-      function fetchAndCalculateProfit(startTimestamp) {
-        return database
-          .ref("/wallet")
-          .orderByChild("timestamp")
-          .startAt(startTimestamp / 1000)
-          .limitToFirst(1)
-          .once("value")
-          .then((snapshot) => {
-            let record = null;
-            snapshot.forEach((child) => (record = child.val()));
-            return record;
-          });
-      }
-
-      // Fetch and process last 7 days data
-      const startOfSevenDaysTimestamp = getLastSevenDaysTimestamp();
-      const endOfDayTimestamp = new Date().getTime();
-      fetchData(startOfSevenDaysTimestamp, endOfDayTimestamp).then((data) => {
-        if (data) processChartData(data, "sevenDaysChart", "Last 7 Days Profit", "sevenDays");
+        },
       });
 
-      // Fetch and process yearly data (by month)
-      const startOfYearTimestamp = getStartOfYearTimestamp();
-      const endOfYearTimestamp = new Date(new Date().getFullYear(), 11, 31).getTime();
-      fetchData(startOfYearTimestamp, endOfYearTimestamp).then((data) => {
-        if (data) processChartData(data, "yearChart", "Yearly Profit by Month", "year");
-      });
+      if (canvasId === "sevenDaysChart") {
+        sevenDaysChart = chartInstance;
+      } else if (canvasId === "yearChart") {
+        yearChart = chartInstance;
+      }
+    }
 
-      updateProfits();
-    </script>
-  </body>
+    function processChartData(data, canvasId, title, period) {
+      const labels = [];
+      const profitData = [];
+      let previousRow = null;
+
+      if (period === "sevenDays") {
+        // Xử lý biểu đồ 7 ngày (theo ngày)
+        const dailyRecords = {};
+        for (let key in data) {
+          const row = data[key];
+          const timestamp = new Date(row.timestamp * 1000);
+          const dateKey = timestamp.toLocaleDateString();
+          dailyRecords[dateKey] = dailyRecords[dateKey] || [];
+          dailyRecords[dateKey].push(row);
+        }
+
+        for (let dateKey in dailyRecords) {
+          const records = dailyRecords[dateKey].sort((a, b) => a.timestamp - b.timestamp);
+          const firstRecord = records[0];
+          const lastRecord = records[records.length - 1];
+          const profit = calculateProfit(lastRecord, firstRecord);
+          labels.push(dateKey);
+          profitData.push(profit);
+        }
+      } else if (period === "year") {
+        // Xử lý biểu đồ năm (theo tháng)
+        const monthlyRecords = {};
+        for (let key in data) {
+          const row = data[key];
+          const timestamp = new Date(row.timestamp * 1000);
+          const monthKey = timestamp.toLocaleString("en-US", { month: "short", year: "numeric" });
+          monthlyRecords[monthKey] = monthlyRecords[monthKey] || [];
+          monthlyRecords[monthKey].push(row);
+        }
+
+        for (let monthKey in monthlyRecords) {
+          const records = monthlyRecords[monthKey].sort((a, b) => a.timestamp - b.timestamp);
+          const firstRecord = records[0];
+          const lastRecord = records[records.length - 1];
+          const profit = calculateProfit(lastRecord, firstRecord);
+          labels.push(monthKey);
+          profitData.push(profit);
+        }
+      }
+
+      // Sắp xếp nhãn theo thời gian
+      const sortedData = labels
+        .map((label, index) => ({ label, profit: profitData[index] }))
+        .sort((a, b) => new Date(a.label) - new Date(b.label));
+      const sortedLabels = sortedData.map(item => item.label);
+      const sortedProfits = sortedData.map(item => item.profit);
+
+      createChart(canvasId, sortedLabels, sortedProfits, title);
+    }
+
+    function calculateProfit(current, previous) {
+      let profit = 0;
+      if (current && previous) {
+        for (let key of ["sol", "usdc", "usdt"]) {
+          const diff = current[key] - previous[key];
+          profit += key === "sol" ? diff * current.price : diff;
+        }
+      }
+      return profit;
+    }
+
+    function updateProfits() {
+      const startDayTimestamp = getStartOfDayTimestamp();
+      const startWeekTimestamp = getStartOfWeekTimestamp();
+      const startMonthTimestamp = getStartOfMonthTimestamp();
+
+      Promise.all([
+        fetchLastRecord(),
+        fetchAndCalculateProfit(startDayTimestamp),
+        fetchAndCalculateProfit(startWeekTimestamp),
+        fetchAndCalculateProfit(startMonthTimestamp),
+      ]).then(([currentWallet, dayStartWallet, weekStartWallet, monthStartWallet]) => {
+        const dayProfit = calculateProfit(currentWallet, dayStartWallet);
+        const weekProfit = calculateProfit(currentWallet, weekStartWallet);
+        const monthProfit = calculateProfit(currentWallet, monthStartWallet);
+
+        document.getElementById("today-profit").textContent = formatCurrency(dayProfit);
+        document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
+        document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
+      });
+    }
+
+    function fetchLastRecord() {
+      return database
+        .ref("/wallet")
+        .orderByChild("timestamp")
+        .limitToLast(1)
+        .once("value")
+        .then((snapshot) => {
+          let record = null;
+          snapshot.forEach((child) => (record = child.val()));
+          return record;
+        });
+    }
+
+    function fetchAndCalculateProfit(startTimestamp) {
+      return database
+        .ref("/wallet")
+        .orderByChild("timestamp")
+        .startAt(startTimestamp / 1000)
+        .limitToFirst(1)
+        .once("value")
+        .then((snapshot) => {
+          let record = null;
+          snapshot.forEach((child) => (record = child.val()));
+          return record;
+        });
+    }
+
+    // Fetch and process last 7 days data
+    const startOfSevenDaysTimestamp = getLastSevenDaysTimestamp();
+    const endOfDayTimestamp = new Date().getTime();
+    fetchData(startOfSevenDaysTimestamp, endOfDayTimestamp).then((data) => {
+      if (data) processChartData(data, "sevenDaysChart", "Last 7 Days Profit", "sevenDays");
+    });
+
+    // Fetch and process yearly data (by month)
+    const startOfYearTimestamp = getStartOfYearTimestamp();
+    const endOfYearTimestamp = new Date(new Date().getFullYear(), 11, 31).getTime();
+    fetchData(startOfYearTimestamp, endOfYearTimestamp).then((data) => {
+      if (data) processChartData(data, "yearChart", "Yearly Profit by Month", "year");
+    });
+
+    updateProfits();
+  </script>
+</body>
+
 </html>
