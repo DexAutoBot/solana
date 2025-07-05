@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <title>Firebase and Chart.js Example</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -16,7 +15,6 @@
       gap: 20px;
     }
 
-    /* Container chính */
     .main-container {
       display: flex;
       width: 100%;
@@ -24,7 +22,6 @@
       gap: 20px;
     }
 
-    /* Khối profit (30% chiều rộng) */
     .profit-section {
       flex: 0 0 20%;
       display: flex;
@@ -55,7 +52,6 @@
       clear: both;
     }
 
-    /* Khối biểu đồ (70% chiều rộng) */
     .chart-section {
       flex: 0 0 80%;
       display: flex;
@@ -77,7 +73,6 @@
       color: #333;
     }
 
-    /* Responsive */
     @media (max-width: 768px) {
       .main-container {
         flex-direction: column;
@@ -89,7 +84,6 @@
       }
     }
 
-    /* Nút reload */
     .reload-button {
       align-self: center;
       padding: 10px 20px;
@@ -107,10 +101,8 @@
     }
   </style>
 </head>
-
 <body>
   <div class="main-container">
-    <!-- Khối profit -->
     <div class="profit-section">
       <div class="profit-container">
         <span class="profit-text">Today profit:</span>
@@ -130,7 +122,6 @@
       <button class="reload-button" onclick="location.reload(true);">Reload Data</button>
     </div>
 
-    <!-- Khối biểu đồ -->
     <div class="chart-section">
       <div class="chart-container">
         <div class="chart-title">Last 7 Days Profit</div>
@@ -167,43 +158,33 @@
 
     function getStartOfDayTimestamp() {
       const now = new Date();
-      let startOfDay = new Date(now);
-      if (now.getHours() < 7) {
-        startOfDay.setDate(now.getDate() - 1);
-      }
-      startOfDay.setHours(7, 0, 0, 0);
+      const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       return startOfDay.getTime();
     }
 
     function getStartOfWeekTimestamp() {
       const now = new Date();
-      const day = now.getDay();
-      const startOfWeek = new Date(now);
-      const daysToMonday = (day + 6) % 7;
-      startOfWeek.setDate(now.getDate() - daysToMonday);
-      startOfWeek.setHours(0, 0, 0, 0);
+      const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      startOfWeek.setUTCDate(now.getUTCDate() - 6); // Đồng bộ với Last 7 Days
       return startOfWeek.getTime();
     }
 
     function getStartOfMonthTimestamp() {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       return startOfMonth.getTime();
     }
 
     function getLastSevenDaysTimestamp() {
       const now = new Date();
-      const startOfSevenDays = new Date(now);
-      startOfSevenDays.setDate(now.getDate() - 6);
-      startOfSevenDays.setHours(0, 0, 0, 0);
+      const startOfSevenDays = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      startOfSevenDays.setUTCDate(now.getUTCDate() - 6);
       return startOfSevenDays.getTime();
     }
 
     function getStartOfYearTimestamp() {
       const now = new Date();
-      const startOfYear = new Date(now.getFullYear(), 0, 1);
-      startOfYear.setHours(0, 0, 0, 0);
+      const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
       return startOfYear.getTime();
     }
 
@@ -258,15 +239,13 @@
     function processChartData(data, canvasId, title, period) {
       const labels = [];
       const profitData = [];
-      let previousRow = null;
 
       if (period === "sevenDays") {
-        // Xử lý biểu đồ 7 ngày (theo ngày)
         const dailyRecords = {};
         for (let key in data) {
           const row = data[key];
           const timestamp = new Date(row.timestamp * 1000);
-          const dateKey = timestamp.toLocaleDateString();
+          const dateKey = timestamp.toLocaleDateString("en-US", { timeZone: "UTC" });
           dailyRecords[dateKey] = dailyRecords[dateKey] || [];
           dailyRecords[dateKey].push(row);
         }
@@ -280,12 +259,11 @@
           profitData.push(profit);
         }
       } else if (period === "year") {
-        // Xử lý biểu đồ năm (theo tháng)
         const monthlyRecords = {};
         for (let key in data) {
           const row = data[key];
           const timestamp = new Date(row.timestamp * 1000);
-          const monthKey = timestamp.toLocaleString("en-US", { month: "short", year: "numeric" });
+          const monthKey = timestamp.toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
           monthlyRecords[monthKey] = monthlyRecords[monthKey] || [];
           monthlyRecords[monthKey].push(row);
         }
@@ -300,10 +278,9 @@
         }
       }
 
-      // Sắp xếp nhãn theo thời gian
       const sortedData = labels
         .map((label, index) => ({ label, profit: profitData[index] }))
-        .sort((a, b) => new Date(a.label) - new Date(b.label));
+        .sort((a, b) => new Date(a.label + " UTC") - new Date(b.label + " UTC"));
       const sortedLabels = sortedData.map(item => item.label);
       const sortedProfits = sortedData.map(item => item.profit);
 
@@ -368,21 +345,19 @@
           return record;
         });
     }
+
     updateProfits();
-    // Fetch and process last 7 days data
     const startOfSevenDaysTimestamp = getLastSevenDaysTimestamp();
     const endOfDayTimestamp = new Date().getTime();
     fetchData(startOfSevenDaysTimestamp, endOfDayTimestamp).then((data) => {
       if (data) processChartData(data, "sevenDaysChart", "Last 7 Days Profit", "sevenDays");
     });
 
-    // Fetch and process yearly data (by month)
     const startOfYearTimestamp = getStartOfYearTimestamp();
-    const endOfYearTimestamp = new Date(new Date().getFullYear(), 11, 31).getTime();
+    const endOfYearTimestamp = new Date(Date.UTC(new Date().getUTCFullYear(), 11, 31)).getTime();
     fetchData(startOfYearTimestamp, endOfYearTimestamp).then((data) => {
       if (data) processChartData(data, "yearChart", "Yearly Profit by Month", "year");
     });
   </script>
 </body>
-
 </html>
