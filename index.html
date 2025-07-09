@@ -105,18 +105,23 @@
   <div class="main-container">
     <div class="profit-section">
       <div class="profit-container">
-        <span class="profit-text">Today profit:</span>
+        <span class="profit-text">Today:</span>
         <span class="profit-value" id="today-profit">0.00$</span>
         <div class="clear"></div>
       </div>
       <div class="profit-container">
-        <span class="profit-text">This week profit:</span>
+        <span class="profit-text">This week:</span>
         <span class="profit-value" id="week-profit">0.00$</span>
         <div class="clear"></div>
       </div>
       <div class="profit-container">
-        <span class="profit-text">This month profit:</span>
+        <span class="profit-text">This month:</span>
         <span class="profit-value" id="month-profit">0.00$</span>
+        <div class="clear"></div>
+      </div>
+      <div class="profit-container">
+        <span class="profit-text">This year:</span>
+        <span class="profit-value" id="year-profit">0.00$</span>
         <div class="clear"></div>
       </div>
       <button class="reload-button" onclick="location.reload(true);">Reload Data</button>
@@ -165,7 +170,9 @@
     function getStartOfWeekTimestamp() {
       const now = new Date();
       const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      startOfWeek.setUTCDate(now.getUTCDate() - 6); // Đồng bộ với Last 7 Days
+      const dayOfWeek = now.getUTCDay(); // 0 (Sunday) to 6 (Saturday)
+      const daysSinceMonday = (dayOfWeek + 6) % 7; // Days since Monday (0 if today is Monday)
+      startOfWeek.setUTCDate(now.getUTCDate() - daysSinceMonday);
       return startOfWeek.getTime();
     }
 
@@ -285,6 +292,7 @@
       const sortedProfits = sortedData.map(item => item.profit);
 
       createChart(canvasId, sortedLabels, sortedProfits, title);
+      return sortedProfits.reduce((sum, profit) => sum + profit, 0); // Return total profit for the period
     }
 
     function calculateProfit(current, previous) {
@@ -302,20 +310,43 @@
       const startDayTimestamp = getStartOfDayTimestamp();
       const startWeekTimestamp = getStartOfWeekTimestamp();
       const startMonthTimestamp = getStartOfMonthTimestamp();
+      const startSevenDaysTimestamp = getLastSevenDaysTimestamp();
+      const startYearTimestamp = getStartOfYearTimestamp();
+      const endTimestamp = new Date().getTime();
 
       Promise.all([
         fetchLastRecord(),
         fetchAndCalculateProfit(startDayTimestamp),
         fetchAndCalculateProfit(startWeekTimestamp),
         fetchAndCalculateProfit(startMonthTimestamp),
-      ]).then(([currentWallet, dayStartWallet, weekStartWallet, monthStartWallet]) => {
+        fetchAndCalculateProfit(startSevenDaysTimestamp),
+        fetchAndCalculateProfit(startYearTimestamp),
+      ]).then(([currentWallet, dayStartWallet, weekStartWallet, monthStartWallet, sevenDaysStartWallet, yearStartWallet]) => {
         const dayProfit = calculateProfit(currentWallet, dayStartWallet);
         const weekProfit = calculateProfit(currentWallet, weekStartWallet);
         const monthProfit = calculateProfit(currentWallet, monthStartWallet);
+        const sevenDaysProfit = calculateProfit(currentWallet, sevenDaysStartWallet);
+        const yearProfit = calculateProfit(currentWallet, yearStartWallet);
 
         document.getElementById("today-profit").textContent = formatCurrency(dayProfit);
         document.getElementById("week-profit").textContent = formatCurrency(weekProfit);
         document.getElementById("month-profit").textContent = formatCurrency(monthProfit);
+        document.getElementById("year-profit").textContent = formatCurrency(yearProfit);
+      });
+
+      // Update charts and calculate total profits
+      fetchData(startSevenDaysTimestamp, endTimestamp).then((data) => {
+        if (data) {
+          const totalSevenDaysProfit = processChartData(data, "sevenDaysChart", "Last 7 Days Profit", "sevenDays");
+          document.getElementById("seven-days-profit").textContent = formatCurrency(totalSevenDaysProfit);
+        }
+      });
+
+      fetchData(startYearTimestamp, endTimestamp).then((data) => {
+        if (data) {
+          const totalYearProfit = processChartData(data, "yearChart", "Yearly Profit by Month", "year");
+          document.getElementById("year-profit").textContent = formatCurrency(totalYearProfit);
+        }
       });
     }
 
@@ -347,17 +378,6 @@
     }
 
     updateProfits();
-    const startOfSevenDaysTimestamp = getLastSevenDaysTimestamp();
-    const endOfDayTimestamp = new Date().getTime();
-    fetchData(startOfSevenDaysTimestamp, endOfDayTimestamp).then((data) => {
-      if (data) processChartData(data, "sevenDaysChart", "Last 7 Days Profit", "sevenDays");
-    });
-
-    const startOfYearTimestamp = getStartOfYearTimestamp();
-    const endOfYearTimestamp = new Date(Date.UTC(new Date().getUTCFullYear(), 11, 31)).getTime();
-    fetchData(startOfYearTimestamp, endOfYearTimestamp).then((data) => {
-      if (data) processChartData(data, "yearChart", "Yearly Profit by Month", "year");
-    });
   </script>
 </body>
 </html>
